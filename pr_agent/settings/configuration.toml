@@ -16,6 +16,7 @@ secret_provider="google_cloud_storage"
 cli_mode=false
 
 [pr_reviewer] # /review #
+require_pr_analysis_review=true
 # enable/disable features
 require_focused_review=false
 require_score_review=false
@@ -25,7 +26,6 @@ require_estimate_effort_to_review=true
 # general options
 num_code_suggestions=4
 inline_code_comments = false
-require_pr_analysis_review = true
 ask_and_reflect=false
 automatic_review=true
 remove_previous_review_comment=false
