@@ -45,6 +45,7 @@ Extra instructions from the user:
 
 You must use the following YAML schema to format your answer:
 ```yaml
+{%- if require_pr_analysis %}
 PR Analysis:
   Main theme:
     type: string
@@ -135,10 +136,12 @@ PR Feedback:
       does this PR code introduce possible vulnerabilities such as exposure of sensitive information (e.g., API keys, secrets, passwords), or security concerns like SQL injection, XSS, CSRF, and others ? Answer 'No' if there are no possible issues.
       Answer 'Yes, because ...' if there are security concerns or issues. Explain your answer shortly.
 {%- endif %}
+{%- endif %}
 ```
 
 Example output:
 ```yaml
+{%- if require_pr_analysis %}
 PR Analysis:
   Main theme: |-
     xxx
@@ -173,6 +176,7 @@ PR Feedback:
 {%- endif %}
 {%- if require_security %}
   Security concerns: No
+{%- endif %}
 {%- endif %}
 ```
 

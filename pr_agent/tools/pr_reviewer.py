@@ -10,7 +10,7 @@ from yaml import SafeLoader
 from pr_agent.algo.ai_handler import AiHandler
 from pr_agent.algo.pr_processing import get_pr_diff, retry_with_fallback_models
 from pr_agent.algo.token_handler import TokenHandler
-from pr_agent.algo.utils import convert_to_markdown, load_yaml, try_fix_yaml, set_custom_labels, get_user_labels
+from pr_agent.algo.utils import convert_to_markdown, get_user_labels, load_yaml, set_custom_labels, try_fix_yaml
 from pr_agent.config_loader import get_settings
 from pr_agent.git_providers import get_git_provider
 from pr_agent.git_providers.git_provider import IncrementalPR, get_main_pr_language
@@ -22,6 +22,7 @@ class PRReviewer:
     """
     The PRReviewer class is responsible for reviewing a pull request and generating feedback using an AI model.
     """
+
     def __init__(self, pr_url: str, is_answer: bool = False, is_auto: bool = False, args: list = None):
         """
         Initialize the PRReviewer object with the necessary attributes and objects to review a pull request.
@@ -31,12 +32,10 @@ class PRReviewer:
             is_answer (bool, optional): Indicates whether the review is being done in answer mode. Defaults to False.
             args (list, optional): List of arguments passed to the PRReviewer class. Defaults to None.
         """
-        self.parse_args(args) # -i command
+        self.parse_args(args)  # -i command
 
         self.git_provider = get_git_provider()(pr_url, incremental=self.incremental)
-        self.main_language = get_main_pr_language(
-            self.git_provider.get_languages(), self.git_provider.get_files()
-        )
+        self.main_language = get_main_pr_language(self.git_provider.get_languages(), self.git_provider.get_files())
         self.pr_url = pr_url
         self.is_answer = is_answer
         self.is_auto = is_auto
@@ -54,14 +53,15 @@ class PRReviewer:
             "description": self.git_provider.get_pr_description(),
             "language": self.main_language,
             "diff": "",  # empty diff for initial calculation
+            "require_pr_analysis": get_settings().pr_reviewer.require_pr_analysis_review,
             "require_score": get_settings().pr_reviewer.require_score_review,
             "require_tests": get_settings().pr_reviewer.require_tests_review,
             "require_security": get_settings().pr_reviewer.require_security_review,
             "require_focused": get_settings().pr_reviewer.require_focused_review,
             "require_estimate_effort_to_review": get_settings().pr_reviewer.require_estimate_effort_to_review,
-            'num_code_suggestions': get_settings().pr_reviewer.num_code_suggestions,
-            'question_str': question_str,
-            'answer_str': answer_str,
+            "num_code_suggestions": get_settings().pr_reviewer.num_code_suggestions,
+            "question_str": question_str,
+            "answer_str": answer_str,
             "extra_instructions": get_settings().pr_reviewer.extra_instructions,
             "commit_messages_str": self.git_provider.get_commit_messages(),
             "custom_labels": "",
@@ -72,7 +72,7 @@ class PRReviewer:
             self.git_provider.pr,
             self.vars,
             get_settings().pr_review_prompt.system,
-            get_settings().pr_review_prompt.user
+            get_settings().pr_review_prompt.user,
         )
 
     def parse_args(self, args: List[str]) -> None:
@@ -99,30 +99,34 @@ class PRReviewer:
 
         try:
             if self.is_auto and not get_settings().pr_reviewer.automatic_review:
-                get_logger().info(f'Automatic review is disabled {self.pr_url}')
+                get_logger().info(f"Automatic review is disabled {self.pr_url}")
                 return None
             if self.incremental.is_incremental and not self._can_run_incremental_review():
                 return None
 
-            get_logger().info(f'Reviewing PR: {self.pr_url} ...')
+            get_logger().info(f"Reviewing PR: {self.pr_url} ...")
 
             if get_settings().config.publish_output:
                 self.git_provider.publish_comment("Preparing review...", is_temporary=True)
 
             await retry_with_fallback_models(self._prepare_prediction)
 
-            get_logger().info('Preparing PR review...')
+            get_logger().info("Preparing PR review...")
             pr_comment = self._prepare_pr_review()
 
             if get_settings().config.publish_output:
-                get_logger().info('Pushing PR review...')
+                get_logger().info("Pushing PR review...")
                 previous_review_comment = self._get_previous_review_comment()
 
                 # publish the review
-                if get_settings().pr_reviewer.persistent_comment and not self.incremental.is_incremental:
-                    self.git_provider.publish_persistent_comment(pr_comment,
-                                                                 initial_header="## PR Analysis",
-                                                                 update_header=True)
+                if (
+                    get_settings().pr_reviewer.persistent_comment
+                    and get_settings().pr_reviewer.require_pr_analysis_review
+                    and not self.incremental.is_incremental
+                ):
+                    self.git_provider.publish_persistent_comment(
+                        pr_comment, initial_header="## PR Analysis", update_header=True
+                    )
                 else:
                     self.git_provider.publish_comment(pr_comment)
 
@@ -130,7 +134,7 @@ class PRReviewer:
                 if previous_review_comment:
                     self._remove_previous_review_comment(previous_review_comment)
                 if get_settings().pr_reviewer.inline_code_comments:
-                    get_logger().info('Pushing inline code comments...')
+                    get_logger().info("Pushing inline code comments...")
                     self._publish_inline_code_comments()
         except Exception as e:
             get_logger().error(f"Failed to review PR: {e}")
@@ -145,9 +149,9 @@ class PRReviewer:
         Returns:
             None
         """
-        get_logger().info('Getting PR diff...')
+        get_logger().info("Getting PR diff...")
         self.patches_diff = get_pr_diff(self.git_provider, self.token_handler, model)
-        get_logger().info('Getting AI prediction...')
+        get_logger().info("Getting AI prediction...")
         self.prediction = await self._get_prediction(model)
 
     async def _get_prediction(self, model: str) -> str:
@@ -172,10 +176,7 @@ class PRReviewer:
             get_logger().info(f"\nUser prompt:\n{user_prompt}")
 
         response, finish_reason = await self.ai_handler.chat_completion(
-            model=model,
-            temperature=0.2,
-            system=system_prompt,
-            user=user_prompt
+            model=model, temperature=0.2, system=system_prompt, user=user_prompt
         )
 
         if get_settings().config.verbosity_level >= 2:
@@ -191,57 +192,62 @@ class PRReviewer:
         data = load_yaml(self.prediction.strip())
 
         # Move 'Security concerns' key to 'PR Analysis' section for better display
-        pr_feedback = data.get('PR Feedback', {})
-        security_concerns = pr_feedback.get('Security concerns')
+        pr_feedback = data.get("PR Feedback", {})
+        security_concerns = pr_feedback.get("Security concerns")
         if security_concerns is not None:
-            del pr_feedback['Security concerns']
+            del pr_feedback["Security concerns"]
             if type(security_concerns) == bool and security_concerns == False:
-                data.setdefault('PR Analysis', {})['Security concerns'] = 'No security concerns found'
+                data.setdefault("PR Analysis", {})["Security concerns"] = "No security concerns found"
             else:
-                data.setdefault('PR Analysis', {})['Security concerns'] = security_concerns
+                data.setdefault("PR Analysis", {})["Security concerns"] = security_concerns
 
         #
-        if 'Code feedback' in pr_feedback:
-            code_feedback = pr_feedback['Code feedback']
+        if "Code feedback" in pr_feedback:
+            code_feedback = pr_feedback["Code feedback"]
 
             # Filter out code suggestions that can be submitted as inline comments
             if get_settings().pr_reviewer.inline_code_comments:
-                del pr_feedback['Code feedback']
+                del pr_feedback["Code feedback"]
             else:
                 for suggestion in code_feedback:
-                    if ('relevant file' in suggestion) and (not suggestion['relevant file'].startswith('``')):
-                        suggestion['relevant file'] = f"``{suggestion['relevant file']}``"
+                    if ("relevant file" in suggestion) and (not suggestion["relevant file"].startswith("``")):
+                        suggestion["relevant file"] = f"``{suggestion['relevant file']}``"
 
-                    if 'relevant line' not in suggestion:
-                        suggestion['relevant line'] = ''
+                    if "relevant line" not in suggestion:
+                        suggestion["relevant line"] = ""
 
-                    relevant_line_str = suggestion['relevant line'].split('\n')[0]
+                    relevant_line_str = suggestion["relevant line"].split("\n")[0]
 
                     # removing '+'
-                    suggestion['relevant line'] = relevant_line_str.lstrip('+').strip()
+                    suggestion["relevant line"] = relevant_line_str.lstrip("+").strip()
 
                     # try to add line numbers link to code suggestions
-                    if hasattr(self.git_provider, 'generate_link_to_relevant_line_number'):
+                    if hasattr(self.git_provider, "generate_link_to_relevant_line_number"):
                         link = self.git_provider.generate_link_to_relevant_line_number(suggestion)
                         if link:
-                            suggestion['relevant line'] = f"[{suggestion['relevant line']}]({link})"
+                            suggestion["relevant line"] = f"[{suggestion['relevant line']}]({link})"
                     else:
                         pass
 
-
         # Add incremental review section
         if self.incremental.is_incremental:
-            last_commit_url = f"{self.git_provider.get_pr_url()}/commits/" \
-                              f"{self.git_provider.incremental.first_new_commit_sha}"
+            last_commit_url = (
+                f"{self.git_provider.get_pr_url()}/commits/" f"{self.git_provider.incremental.first_new_commit_sha}"
+            )
             last_commit_msg = self.incremental.commits_range[0].commit.message if self.incremental.commits_range else ""
             incremental_review_markdown_text = f"Starting from commit {last_commit_url}"
             if last_commit_msg:
-                replacement = last_commit_msg.splitlines(keepends=False)[0].replace('_', r'\_')
+                replacement = last_commit_msg.splitlines(keepends=False)[0].replace("_", r"\_")
                 incremental_review_markdown_text += f"  \n_({replacement})_"
             data = OrderedDict(data)
-            data.update({'Incremental PR Review': {
-                "⏮️ Review for commits since previous PR-Agent review": incremental_review_markdown_text}})
-            data.move_to_end('Incremental PR Review', last=False)
+            data.update(
+                {
+                    "Incremental PR Review": {
+                        "⏮️ Review for commits since previous PR-Agent review": incremental_review_markdown_text
+                    }
+                }
+            )
+            data.move_to_end("Incremental PR Review", last=False)
 
         markdown_text = convert_to_markdown(data, self.git_provider.is_supported("gfm_markdown"))
         user = self.git_provider.get_user_id()
@@ -251,7 +257,9 @@ class PRReviewer:
             markdown_text += "\n### How to use\n"
             if self.git_provider.is_supported("gfm_markdown"):
                 markdown_text += "\n <details> <summary> Instructions</summary>\n\n"
-            bot_user = "[bot]" if get_settings().github_app.override_deployment_type else get_settings().github_app.bot_user
+            bot_user = (
+                "[bot]" if get_settings().github_app.override_deployment_type else get_settings().github_app.bot_user
+            )
             if user and bot_user not in user:
                 markdown_text += bot_help_text(user)
             else:
@@ -280,10 +288,10 @@ class PRReviewer:
 
         data = load_yaml(self.prediction.strip())
         comments: List[str] = []
-        for suggestion in data.get('PR Feedback', {}).get('Code feedback', []):
-            relevant_file = suggestion.get('relevant file', '').strip()
-            relevant_line_in_file = suggestion.get('relevant line', '').strip()
-            content = suggestion.get('suggestion', '')
+        for suggestion in data.get("PR Feedback", {}).get("Code feedback", []):
+            relevant_file = suggestion.get("relevant file", "").strip()
+            relevant_line_in_file = suggestion.get("relevant line", "").strip()
+            content = suggestion.get("suggestion", "")
             if not relevant_file or not relevant_line_in_file or not content:
                 get_logger().info("Skipping inline comment with missing file/line/content")
                 continue
@@ -296,7 +304,7 @@ class PRReviewer:
                 self.git_provider.publish_inline_comment(content, relevant_file, relevant_line_in_file)
 
         if comments:
-                self.git_provider.publish_inline_comments(comments)
+            self.git_provider.publish_inline_comments(comments)
 
     def _get_user_answers(self) -> Tuple[str, str]:
         """
@@ -314,7 +322,7 @@ class PRReviewer:
             for message in discussion_messages.reversed:
                 if "Questions to better understand the PR:" in message.body:
                     question_str = message.body
-                elif '/answer' in message.body:
+                elif "/answer" in message.body:
                     answer_str = message.body
 
                 if answer_str and question_str:
@@ -327,7 +335,9 @@ class PRReviewer:
         Get the previous review comment if it exists.
         """
         try:
-            if get_settings().pr_reviewer.remove_previous_review_comment and hasattr(self.git_provider, "get_previous_review"):
+            if get_settings().pr_reviewer.remove_previous_review_comment and hasattr(
+                self.git_provider, "get_previous_review"
+            ):
                 return self.git_provider.get_previous_review(
                     full=not self.incremental.is_incremental,
                     incremental=self.incremental.is_incremental,
@@ -377,25 +387,30 @@ class PRReviewer:
         return True
 
     def set_review_labels(self, data):
-        if (get_settings().pr_reviewer.enable_review_labels_security or
-                get_settings().pr_reviewer.enable_review_labels_effort):
+        if (
+            get_settings().pr_reviewer.enable_review_labels_security
+            or get_settings().pr_reviewer.enable_review_labels_effort
+        ):
             try:
                 review_labels = []
                 if get_settings().pr_reviewer.enable_review_labels_effort:
-                    estimated_effort = data['PR Analysis']['Estimated effort to review [1-5]']
-                    estimated_effort_number = int(estimated_effort.split(',')[0])
-                    if 1 <= estimated_effort_number <= 5: # 1, because ...
-                        review_labels.append(f'Review effort [1-5]: {estimated_effort_number}')
+                    estimated_effort = data["PR Analysis"]["Estimated effort to review [1-5]"]
+                    estimated_effort_number = int(estimated_effort.split(",")[0])
+                    if 1 <= estimated_effort_number <= 5:  # 1, because ...
+                        review_labels.append(f"Review effort [1-5]: {estimated_effort_number}")
                 if get_settings().pr_reviewer.enable_review_labels_security:
-                    security_concerns = data['PR Analysis']['Security concerns'] # yes, because ...
-                    security_concerns_bool = 'yes' in security_concerns.lower() or 'true' in security_concerns.lower()
+                    security_concerns = data["PR Analysis"]["Security concerns"]  # yes, because ...
+                    security_concerns_bool = "yes" in security_concerns.lower() or "true" in security_concerns.lower()
                     if security_concerns_bool:
-                        review_labels.append('Possible security concern')
+                        review_labels.append("Possible security concern")
 
                 current_labels = self.git_provider.get_labels()
-                current_labels_filtered = [label for label in current_labels if
-                                           not label.lower().startswith('review effort [1-5]:') and not label.lower().startswith(
-                                               'possible security concern')]
+                current_labels_filtered = [
+                    label
+                    for label in current_labels
+                    if not label.lower().startswith("review effort [1-5]:")
+                    and not label.lower().startswith("possible security concern")
+                ]
                 if current_labels or review_labels:
                     get_logger().info(f"Setting review labels: {review_labels + current_labels_filtered}")
                     self.git_provider.publish_labels(review_labels + current_labels_filtered)
