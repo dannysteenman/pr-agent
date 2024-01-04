@@ -46,6 +46,7 @@ Extra instructions from the user:
 
 You must use the following YAML schema to format your answer:
 ```yaml
+{%- if require_pr_analysis %}
 PR Analysis:
   Main theme:
     type: string
@@ -98,6 +99,7 @@ PR Analysis:
       Take into account the size, complexity, quality, and the needed changes of the PR code diff.
       Explain your answer shortly (1-2 sentences). Use the format: '1, because ...'
 {%- endif %}
+{%- endif %}
 PR Feedback:
   General suggestions:
     type: string
@@ -120,7 +122,6 @@ PR Feedback:
         description: |-
           a concrete suggestion for meaningfully improving the new PR code.
           Also describe how, specifically, the suggestion can be applied to new PR code.
-          Add tags with importance measure that matches each suggestion ('important' or 'medium').
           Do not make suggestions for updating or adding docstrings, renaming PR title and description, or linter like.
       relevant line:
         type: string
@@ -140,6 +141,7 @@ PR Feedback:
 
 Example output:
 ```yaml
+{%- if require_pr_analysis %}
 PR Analysis:
   Main theme: |-
     xxx
@@ -158,6 +160,7 @@ PR Analysis:
 {%- if require_estimate_effort_to_review %}
   Estimated effort to review [1-5]: |-
     3, because ...
+{%- endif %}
 {%- endif %}
 PR Feedback:
   General PR suggestions: |-
