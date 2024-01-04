@@ -1,4 +1,4 @@
-name: ci
+name: build-and-push-docker-image
 
 on:
   push:
@@ -23,6 +23,6 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: ./docker/Dockerfile.local
+          file: ./docker/Dockerfile.local
           push: true
           tags: dannysteenman/pr-agent:latest
