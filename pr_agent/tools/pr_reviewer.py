@@ -54,6 +54,7 @@ class PRReviewer:
 
         answer_str, question_str = self._get_user_answers()
         self.vars = {
+            "require_pr_analysis": get_settings().pr_reviewer.require_pr_analysis_review,
             "title": self.git_provider.pr.title,
             "branch": self.git_provider.get_pr_branch(),
             "description": self.git_provider.get_pr_description(),
@@ -120,7 +121,9 @@ class PRReviewer:
                 previous_review_comment = self._get_previous_review_comment()
 
                 # publish the review
-                if get_settings().pr_reviewer.persistent_comment and not self.incremental.is_incremental:
+                if not get_settings().pr_reviewer.require_pr_analysis_review:
+                    get_logger().info("SKipping PR Analysis comment...")
+                elif get_settings().pr_reviewer.persistent_comment and not self.incremental.is_incremental:
                     self.git_provider.publish_persistent_comment(pr_comment,
                                                                  initial_header="## PR Analysis",
                                                                  update_header=True)
