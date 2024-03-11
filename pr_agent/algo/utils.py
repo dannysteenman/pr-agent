@@ -28,7 +28,39 @@ def get_setting(key: str) -> Any:
     except Exception:
         return global_settings.get(key, None)
 
-def convert_to_markdown(output_data: dict, gfm_supported: bool=True) -> str:
+
+def emphasize_header(text: str) -> str:
+    try:
+        # Finding the position of the first occurrence of ": "
+        colon_position = text.find(": ")
+
+        # Splitting the string and wrapping the first part in <strong> tags
+        if colon_position != -1:
+            # Everything before the colon (inclusive) is wrapped in <strong> tags
+            transformed_string = "<strong>" + text[:colon_position + 1] + "</strong>" + text[colon_position + 1:]
+        else:
+            # If there's no ": ", return the original string
+            transformed_string = text
+
+        return transformed_string
+    except Exception as e:
+        get_logger().exception(f"Failed to emphasize header: {e}")
+        return text
+
+
+def unique_strings(input_list: List[str]) -> List[str]:
+    if not input_list or not isinstance(input_list, list):
+        return input_list
+    seen = set()
+    unique_list = []
+    for item in input_list:
+        if item not in seen:
+            unique_list.append(item)
+            seen.add(item)
+    return unique_list
+
+
+def convert_to_markdown(output_data: dict, gfm_supported: bool = True, incremental_review=None) -> str:
     """
     Convert a dictionary of data into markdown format.
     Args:
@@ -48,9 +80,14 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool=True) -> str:
         "Estimated effort to review [1-5]": "⏱️",
     }
     markdown_text = ""
-    markdown_text += f"## PR Review\n\n"
-    markdown_text += "<table>\n<tr>\n"
-    markdown_text += """<td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>PR&nbsp;feedback</strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </td> <td></td></tr>"""
+    if not incremental_review:
+        markdown_text += f"## PR Review\n\n"
+    else:
+        markdown_text += f"## Incremental PR Review\n\n"
+        markdown_text += f"⏮️ Review for commits since previous PR-Agent review {incremental_review}.\n\n"
+    if gfm_supported:
+        markdown_text += "<table>\n<tr>\n"
+        # markdown_text += """<td> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Feedback&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td> <td></td></tr>"""
 
     if not output_data or not output_data.get('review', {}):
         return ""
@@ -60,16 +97,49 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool=True) -> str:
             continue
         key_nice = key.replace('_', ' ').capitalize()
         emoji = emojis.get(key_nice, "")
-        markdown_text += f"<tr><td> {emoji} {key_nice}</td><td>\n\n{value}\n\n</td></tr>\n"
-    markdown_text += "</table>\n"
+        if gfm_supported:
+            if 'Estimated effort to review' in key_nice:
+                key_nice = 'Estimated&nbsp;effort&nbsp;to&nbsp;review [1-5]'
+            if 'security concerns' in key_nice.lower():
+                value = emphasize_header(value.strip())
+                markdown_text += f"<tr><td> {emoji}&nbsp;<strong>{key_nice}</strong></td><td>\n\n{value}\n\n</td></tr>\n"
+            elif 'possible issues' in key_nice.lower():
+                value = value.strip()
+                issues = value.split('\n- ')
+                for i, _ in enumerate(issues):
+                    issues[i] = issues[i].strip().strip('-').strip()
+                issues = unique_strings(issues) # remove duplicates
+                number_of_issues = len(issues)
+                if number_of_issues > 1:
+                    markdown_text += f"<tr><td rowspan={number_of_issues}> {emoji}&nbsp;<strong>{key_nice}</strong></td>\n"
+                    for i, issue in enumerate(issues):
+                        if not issue:
+                            continue
+                        issue = emphasize_header(issue)
+                        if i == 0:
+                            markdown_text += f"<td>\n\n{issue}</td></tr>\n"
+                        else:
+                            markdown_text += f"<tr>\n<td>\n\n{issue}</td></tr>\n"
+                else:
+                    value = emphasize_header(value.strip('-').strip())
+                    markdown_text += f"<tr><td> {emoji}&nbsp;<strong>{key_nice}</strong></td><td>\n\n{value}\n\n</td></tr>\n"
+            else:
+                markdown_text += f"<tr><td> {emoji}&nbsp;<strong>{key_nice}</strong></td><td>\n\n{value}\n\n</td></tr>\n"
+        else:
+            if len(value.split()) > 1:
+                markdown_text += f"{emoji} **{key_nice}:**\n\n {value}\n\n"
+            else:
+                markdown_text += f"{emoji} **{key_nice}:** {value}\n\n"
+    if gfm_supported:
+        markdown_text += "</table>\n"
 
     if 'code_feedback' in output_data:
         if gfm_supported:
             markdown_text += f"\n\n"
             markdown_text += f"<details><summary> <strong>Code feedback:</strong></summary>\n\n"
+            markdown_text += "<hr>"
         else:
             markdown_text += f"\n\n** Code feedback:**\n\n"
-        markdown_text += "<hr>"
         for i, value in enumerate(output_data['code_feedback']):
             if value is None or value == '' or value == {} or value == []:
                 continue
@@ -123,6 +193,10 @@ def parse_code_suggestion(code_suggestion: dict, i: int = 0, gfm_supported: bool
         markdown_text += "<hr>"
     else:
         for sub_key, sub_value in code_suggestion.items():
+            if isinstance(sub_key, str):
+                sub_key = sub_key.rstrip()
+            if isinstance(sub_value,str):
+                sub_value = sub_value.rstrip()
             if isinstance(sub_value, dict):  # "code example"
                 markdown_text += f"  - **{sub_key}:**\n"
                 for code_key, code_value in sub_value.items():  # 'before' and 'after' code
@@ -134,10 +208,9 @@ def parse_code_suggestion(code_suggestion: dict, i: int = 0, gfm_supported: bool
                     markdown_text += f"\n  - **{sub_key}:** {sub_value}  \n"
                 else:
                     markdown_text += f"   **{sub_key}:** {sub_value}  \n"
-                if not gfm_supported:
-                    if "relevant_line" not in sub_key.lower():  # nicer presentation
-                        # markdown_text = markdown_text.rstrip('\n') + "\\\n" # works for gitlab
-                        markdown_text = markdown_text.rstrip('\n') + "   \n"  # works for gitlab and bitbucker
+                if "relevant_line" not in sub_key.lower():  # nicer presentation
+                    # markdown_text = markdown_text.rstrip('\n') + "\\\n" # works for gitlab
+                    markdown_text = markdown_text.rstrip('\n') + "   \n"  # works for gitlab and bitbucker
 
         markdown_text += "\n"
     return markdown_text
@@ -361,9 +434,9 @@ def try_fix_yaml(response_text: str, keys_fix_yaml: List[str] = []) -> dict:
             pass
 
      # third fallback - try to remove leading and trailing curly brackets
-    response_text_copy = response_text.strip().rstrip().removeprefix('{').removesuffix('}')
+    response_text_copy = response_text.strip().rstrip().removeprefix('{').removesuffix('}').rstrip(':\n')
     try:
-        data = yaml.safe_load(response_text_copy,)
+        data = yaml.safe_load(response_text_copy)
         get_logger().info(f"Successfully parsed AI prediction after removing curly brackets")
         return data
     except:
@@ -374,7 +447,7 @@ def try_fix_yaml(response_text: str, keys_fix_yaml: List[str] = []) -> dict:
     for i in range(1, len(response_text_lines)):
         response_text_lines_tmp = '\n'.join(response_text_lines[:-i])
         try:
-            data = yaml.safe_load(response_text_lines_tmp,)
+            data = yaml.safe_load(response_text_lines_tmp)
             get_logger().info(f"Successfully parsed AI prediction after removing {i} lines")
             return data
         except:
@@ -422,7 +495,7 @@ def get_user_labels(current_labels: List[str] = None):
                     continue
             user_labels.append(label)
         if user_labels:
-            get_logger().info(f"Keeping user labels: {user_labels}")
+            get_logger().debug(f"Keeping user labels: {user_labels}")
     except Exception as e:
         get_logger().exception(f"Failed to get user labels: {e}")
         return current_labels

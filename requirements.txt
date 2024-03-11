@@ -1,6 +1,7 @@
 aiohttp==3.9.1
 atlassian-python-api==3.41.4
 azure-devops==7.1.0b3
+azure-identity==1.15.0
 boto3==1.33.6
 dynaconf==3.2.4
 fastapi==0.99.0
@@ -8,10 +9,10 @@ GitPython==3.1.32
 google-cloud-aiplatform==1.35.0
 google-cloud-storage==2.10.0
 Jinja2==3.1.2
-litellm==0.12.5
+litellm==1.29.1
 loguru==0.7.2
 msrest==0.7.1
-openai==0.27.8
+openai==1.13.3
 pinecone-client
 pinecone-datasets @ git+https://github.com/mrT23/pinecone-datasets.git@main
 lancedb==0.5.1
@@ -24,4 +25,5 @@ starlette-context==0.3.6
 tiktoken==0.5.2
 ujson==5.8.0
 uvicorn==0.22.0
+tenacity==8.2.3
 # langchain==0.0.349 # uncomment this to support language LangChainOpenAIHandler

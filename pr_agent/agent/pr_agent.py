@@ -13,7 +13,9 @@ from pr_agent.tools.pr_code_suggestions import PRCodeSuggestions
 from pr_agent.tools.pr_config import PRConfig
 from pr_agent.tools.pr_description import PRDescription
 from pr_agent.tools.pr_generate_labels import PRGenerateLabels
+from pr_agent.tools.pr_help_message import PRHelpMessage
 from pr_agent.tools.pr_information_from_user import PRInformationFromUser
+from pr_agent.tools.pr_line_questions import PR_LineQuestions
 from pr_agent.tools.pr_questions import PRQuestions
 from pr_agent.tools.pr_reviewer import PRReviewer
 from pr_agent.tools.pr_similar_issue import PRSimilarIssue
@@ -32,9 +34,11 @@ command2class = {
     "improve_code": PRCodeSuggestions,
     "ask": PRQuestions,
     "ask_question": PRQuestions,
+    "ask_line": PR_LineQuestions,
     "update_changelog": PRUpdateChangelog,
     "config": PRConfig,
     "settings": PRConfig,
+    "help": PRHelpMessage,
     "similar_issue": PRSimilarIssue,
     "add_docs": PRAddDocs,
     "generate_labels": PRGenerateLabels,
@@ -64,25 +68,27 @@ class PRAgent:
             for forbidden_arg in self.forbidden_cli_args:
                 for arg in args:
                     if forbidden_arg in arg:
-                        get_logger().error(f"CLI argument '{forbidden_arg}' is forbidden")
+                        get_logger().error(f"CLI argument for param '{forbidden_arg}' is forbidden. Use instead a configuration file.")
                         return False
         args = update_settings_from_args(args)
 
         action = action.lstrip("/").lower()
-        if action == "reflect_and_review":
-            get_settings().pr_reviewer.ask_and_reflect = True
-        if action == "answer":
-            if notify:
-                notify()
-            await PRReviewer(pr_url, is_answer=True, args=args, ai_handler=self.ai_handler).run()
-        elif action == "auto_review":
-            await PRReviewer(pr_url, is_auto=True, args=args, ai_handler=self.ai_handler).run()
-        elif action in command2class:
-            if notify:
-                notify()
-                
-            await command2class[action](pr_url, ai_handler=self.ai_handler, args=args).run()
-        else:
-            return False
-        return True
+        with get_logger().contextualize(command=action):
+            get_logger().info("PR-Agent request handler started", analytics=True)
+            if action == "reflect_and_review":
+                get_settings().pr_reviewer.ask_and_reflect = True
+            if action == "answer":
+                if notify:
+                    notify()
+                await PRReviewer(pr_url, is_answer=True, args=args, ai_handler=self.ai_handler).run()
+            elif action == "auto_review":
+                await PRReviewer(pr_url, is_auto=True, args=args, ai_handler=self.ai_handler).run()
+            elif action in command2class:
+                if notify:
+                    notify()
+
+                await command2class[action](pr_url, ai_handler=self.ai_handler, args=args).run()
+            else:
+                return False
+            return True
 

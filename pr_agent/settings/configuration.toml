@@ -7,6 +7,7 @@ publish_output=true
 publish_output_progress=true
 verbosity_level=0 # 0,1,2
 use_extra_bad_extensions=false
+use_wiki_settings_file=true
 use_repo_settings_file=true
 use_global_settings_file=true
 ai_timeout=120 # 2minutes
@@ -16,6 +17,8 @@ max_model_tokens = 32000 # Limits the maximum number of tokens that can be used 
 patch_extra_lines = 1
 secret_provider="google_cloud_storage"
 cli_mode=false
+ai_disclaimer_title=""  # Pro feature, title for a collapsible disclaimer to AI outputs
+ai_disclaimer=""  # Pro feature, full text for the AI disclaimer
 
 [pr_reviewer] # /review #
 # enable/disable features
@@ -31,9 +34,9 @@ num_code_suggestions=4
 inline_code_comments = false
 ask_and_reflect=false
 #automatic_review=true
-remove_previous_review_comment=false
 persistent_comment=true
 extra_instructions = ""
+final_update_message = true
 # review labels
 enable_review_labels_security=true
 enable_review_labels_effort=true
@@ -56,7 +59,8 @@ use_bullet_points=true
 extra_instructions = ""
 enable_pr_type=true
 final_update_message = true
-enable_help_text=true
+enable_help_text=false
+enable_help_comment=true
 ## changes walkthrough section
 enable_semantic_files_types=true
 collapsible_file_list='adaptive' # true, false, 'adaptive'
@@ -105,6 +109,15 @@ file = ""              # in case there are several components with the same name
 class_name = ""        # in case there are several methods with the same name in the same file, you can specify the relevant class name
 enable_help_text=true
 
+
+[checks] # /checks (pro feature) #
+enable_auto_checks_feedback=true
+excluded_checks_list=["lint"] # list of checks to exclude, for example: ["check1", "check2"]
+persistent_comment=true
+enable_help_text=true
+
+[pr_help] # /help #
+
 [pr_config] # /config #
 
 [github]
@@ -122,14 +135,9 @@ try_fix_invalid_inline_comments = true
 
 [github_app]
 # these toggles allows running the github app from custom deployments
-bot_user = "github-actions[bot]"
 override_deployment_type = true
-# in some deployments it's possible to get duplicate requests if the handling is long,
-# these settings are used to avoid handling duplicate requests.
-duplicate_requests_cache = false
-duplicate_requests_cache_ttl = 60  # in seconds
 # settings for "pull_request" event
-handle_pr_actions = ['opened', 'reopened', 'ready_for_review', 'review_requested']
+handle_pr_actions = ['opened', 'reopened', 'ready_for_review']
 pr_commands = [
     "/describe --pr_description.add_original_user_description=true --pr_description.keep_original_user_title=true",
     "/review --pr_reviewer.num_code_suggestions=0",
@@ -144,38 +152,23 @@ push_trigger_pending_tasks_backlog = true
 push_trigger_pending_tasks_ttl = 300
 push_commands = [
     "/describe --pr_description.add_original_user_description=true --pr_description.keep_original_user_title=true",
-    """/auto_review -i \
-       --pr_reviewer.require_focused_review=false \
-       --pr_reviewer.require_score_review=false \
-       --pr_reviewer.require_tests_review=false \
-       --pr_reviewer.require_estimate_effort_to_review=false \
-       --pr_reviewer.num_code_suggestions=0 \
-       --pr_reviewer.inline_code_comments=false \
-       --pr_reviewer.remove_previous_review_comment=true \
-       --pr_reviewer.require_all_thresholds_for_incremental_review=false \
-       --pr_reviewer.minimal_commits_for_incremental_review=5 \
-       --pr_reviewer.minimal_minutes_for_incremental_review=30 \
-       --pr_reviewer.extra_instructions='' \
-    """
+    "/review --pr_reviewer.num_code_suggestions=0",
 ]
+ignore_pr_title = []
 
 [gitlab]
-# URL to the gitlab service
-url = "https://gitlab.com"
-
-# Polling (either project id or namespace/project_name) syntax can be used
-projects_to_monitor = ['org_name/repo_name']
-
-# Polling trigger
-magic_word = "AutoReview"
-
-# Polling interval
-polling_interval_seconds = 30
+url = "https://gitlab.com" # URL to the gitlab service
+pr_commands = [
+    "/describe --pr_description.add_original_user_description=true --pr_description.keep_original_user_title=true",
+    "/review --pr_reviewer.num_code_suggestions=0",
+    "/improve --pr_code_suggestions.summarize=true",
+]
 
 [bitbucket_app]
-#auto_review = true    # set as config var in .pr_agent.toml
-#auto_describe = true  # set as config var in .pr_agent.toml
-#auto_improve = true   # set as config var in .pr_agent.toml
+pr_commands = [
+    "/review --pr_reviewer.num_code_suggestions=0",
+    "/improve --pr_code_suggestions.summarize=false",
+]
 
 
 [local]

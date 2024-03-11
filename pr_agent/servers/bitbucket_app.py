@@ -1,3 +1,4 @@
+import base64
 import copy
 import hashlib
 import json
@@ -15,8 +16,11 @@ from starlette_context import context
 from starlette_context.middleware import RawContextMiddleware
 
 from pr_agent.agent.pr_agent import PRAgent
+from pr_agent.algo.utils import update_settings_from_args
 from pr_agent.config_loader import get_settings, global_settings
 from pr_agent.git_providers.utils import apply_repo_settings
+from pr_agent.identity_providers import get_identity_provider
+from pr_agent.identity_providers.identity_provider import Eligibility
 from pr_agent.log import LoggingFormat, get_logger, setup_logger
 from pr_agent.secret_providers import get_secret_provider
 from pr_agent.servers.github_action_runner import get_setting_or_env, is_true
@@ -24,7 +28,7 @@ from pr_agent.tools.pr_code_suggestions import PRCodeSuggestions
 from pr_agent.tools.pr_description import PRDescription
 from pr_agent.tools.pr_reviewer import PRReviewer
 
-setup_logger(fmt=LoggingFormat.JSON)
+setup_logger(fmt=LoggingFormat.JSON, level="DEBUG")
 router = APIRouter()
 secret_provider = get_secret_provider() if get_settings().get("CONFIG.SECRET_PROVIDER") else None
 
@@ -69,6 +73,24 @@ async def handle_manifest(request: Request, response: Response):
     manifest_obj = json.loads(manifest)
     return JSONResponse(manifest_obj)
 
+
+async def _perform_commands_bitbucket(commands_conf: str, agent: PRAgent, api_url: str, log_context: dict):
+    apply_repo_settings(api_url)
+    commands = get_settings().get(f"bitbucket_app.{commands_conf}", {})
+    for command in commands:
+        try:
+            split_command = command.split(" ")
+            command = split_command[0]
+            args = split_command[1:]
+            other_args = update_settings_from_args(args)
+            new_command = ' '.join([command] + other_args)
+            get_logger().info(f"Performing command: {new_command}")
+            with get_logger().contextualize(**log_context):
+                await agent.handle_request(api_url, new_command)
+        except Exception as e:
+            get_logger().error(f"Failed to perform command {command}: {e}")
+
+
 @router.post("/webhook")
 async def handle_github_webhooks(background_tasks: BackgroundTasks, request: Request):
     log_context = {"server_type": "bitbucket_app"}
@@ -80,11 +102,27 @@ async def handle_github_webhooks(background_tasks: BackgroundTasks, request: Req
     get_logger().debug(data)
     async def inner():
         try:
-            owner = data["data"]["repository"]["owner"]["username"]
+            try:
+                if data["data"]["actor"]["type"] != "user":
+                    return "OK"
+            except KeyError:
+                get_logger().error("Failed to get actor type, check previous logs, this shouldn't happen.")
+            try:
+                owner = data["data"]["repository"]["owner"]["username"]
+            except Exception as e:
+                get_logger().error(f"Failed to get owner, will continue: {e}")
+                owner = "unknown"
+            sender_id = data["data"]["actor"]["account_id"]
             log_context["sender"] = owner
-            secrets = json.loads(secret_provider.get_secret(owner))
+            log_context["sender_id"] = sender_id
+            jwt_parts = input_jwt.split(".")
+            claim_part = jwt_parts[1]
+            claim_part += "=" * (-len(claim_part) % 4)
+            decoded_claims = base64.urlsafe_b64decode(claim_part)
+            claims = json.loads(decoded_claims)
+            client_key = claims["iss"]
+            secrets = json.loads(secret_provider.get_secret(client_key))
             shared_secret = secrets["shared_secret"]
-            client_key = secrets["client_key"]
             jwt.decode(input_jwt, shared_secret, audience=client_key, algorithms=["HS256"])
             bearer_token = await get_bearer_token(shared_secret, client_key)
             context['bitbucket_bearer_token'] = bearer_token
@@ -98,24 +136,29 @@ async def handle_github_webhooks(background_tasks: BackgroundTasks, request: Req
                 if pr_url:
                     with get_logger().contextualize(**log_context):
                         apply_repo_settings(pr_url)
-                        auto_review = get_setting_or_env("BITBUCKET_APP.AUTO_REVIEW", None)
-                        if auto_review is None or is_true(auto_review):  # by default, auto review is enabled
-                            await PRReviewer(pr_url).run()
-                        auto_improve = get_setting_or_env("BITBUCKET_APP.AUTO_IMPROVE", None)
-                        if is_true(auto_improve):  # by default, auto improve is disabled
-                            await PRCodeSuggestions(pr_url).run()
-                        auto_describe = get_setting_or_env("BITBUCKET_APP.AUTO_DESCRIBE", None)
-                        if is_true(auto_describe):  # by default, auto describe is disabled
-                            await PRDescription(pr_url).run()
-                # with get_logger().contextualize(**log_context):
-                #     await agent.handle_request(pr_url, "review")
+                        if get_identity_provider().verify_eligibility("bitbucket",
+                                                        sender_id, pr_url) is not Eligibility.NOT_ELIGIBLE:
+                            if get_settings().get("bitbucket_app.pr_commands"):
+                                await _perform_commands_bitbucket("pr_commands", PRAgent(), pr_url, log_context)
+                            else: # backwards compatibility
+                                auto_review = get_setting_or_env("BITBUCKET_APP.AUTO_REVIEW", None)
+                                if is_true(auto_review):  # by default, auto review is disabled
+                                    await PRReviewer(pr_url).run()
+                                auto_improve = get_setting_or_env("BITBUCKET_APP.AUTO_IMPROVE", None)
+                                if is_true(auto_improve):  # by default, auto improve is disabled
+                                    await PRCodeSuggestions(pr_url).run()
+                                auto_describe = get_setting_or_env("BITBUCKET_APP.AUTO_DESCRIBE", None)
+                                if is_true(auto_describe):  # by default, auto describe is disabled
+                                    await PRDescription(pr_url).run()
             elif event == "pullrequest:comment_created":
                 pr_url = data["data"]["pullrequest"]["links"]["html"]["href"]
                 log_context["api_url"] = pr_url
                 log_context["event"] = "comment"
                 comment_body = data["data"]["comment"]["content"]["raw"]
                 with get_logger().contextualize(**log_context):
-                    await agent.handle_request(pr_url, comment_body)
+                    if get_identity_provider().verify_eligibility("bitbucket",
+                                                                     sender_id, pr_url) is not Eligibility.NOT_ELIGIBLE:
+                        await agent.handle_request(pr_url, comment_body)
         except Exception as e:
             get_logger().error(f"Failed to handle webhook: {e}")
     background_tasks.add_task(inner)
