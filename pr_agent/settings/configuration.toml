@@ -4,7 +4,7 @@ model_turbo="anthropic/claude-3-haiku-20240307"
 fallback_models=["anthropic/claude-3-haiku-20240307"]
 git_provider="github"
 publish_output=true
-publish_output_progress=true
+publish_output_progress=false
 verbosity_level=0 # 0,1,2
 use_extra_bad_extensions=false
 use_wiki_settings_file=true
@@ -13,7 +13,7 @@ use_global_settings_file=true
 ai_timeout=120 # 2minutes
 max_description_tokens = 500
 max_commits_tokens = 500
-max_model_tokens = 32000 # Limits the maximum number of tokens that can be used by any model, regardless of the model's default capabilities.
+max_model_tokens = 64000 # Limits the maximum number of tokens that can be used by any model, regardless of the model's default capabilities.
 patch_extra_lines = 1
 secret_provider="google_cloud_storage"
 cli_mode=false
@@ -23,23 +23,23 @@ ai_disclaimer=""  # Pro feature, full text for the AI disclaimer
 [pr_reviewer] # /review #
 # enable/disable features
 require_score_review=false
-require_tests_review=true
-require_estimate_effort_to_review=true
+require_tests_review=false
+require_estimate_effort_to_review=false
 require_can_be_split_review=false
 # soc2
 require_soc2_ticket=false
 soc2_ticket_prompt="Does the PR description include a link to ticket in a project management system (e.g., Jira, Asana, Trello, etc.) ?"
 # general options
 num_code_suggestions=4
-inline_code_comments = false
+inline_code_comments = true
 ask_and_reflect=false
 #automatic_review=true
 persistent_comment=true
 extra_instructions = ""
 final_update_message = true
 # review labels
-enable_review_labels_security=true
-enable_review_labels_effort=true
+enable_review_labels_security=false
+enable_review_labels_effort=false
 # specific configurations for incremental review (/review -i)
 require_all_thresholds_for_incremental_review=false
 minimal_commits_for_incremental_review=0
@@ -204,7 +204,7 @@ url = ""
 
 [litellm]
 # use_client = false
-# drop_params = false
+drop_params = true
 
 [pr_similar_issue]
 skip_comments = false
