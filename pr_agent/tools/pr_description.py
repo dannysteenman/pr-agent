@@ -41,6 +41,7 @@ class PRDescription:
 
         # Initialize the AI handler
         self.ai_handler = ai_handler()
+        self.ai_handler.main_pr_language = self.main_pr_language
 
     
         # Initialize the variables dictionary
@@ -112,22 +113,33 @@ class PRDescription:
                 pr_body += HelpMessage.get_describe_usage_guide()
                 pr_body += "\n</details>\n"
             elif get_settings().pr_description.enable_help_comment:
-                pr_body += "\n\n___\n\n> ✨ **PR-Agent usage**:"
+                pr_body += "\n\n___\n\n> 💡 **PR-Agent usage**:"
                 pr_body += "\n>Comment `/help` on the PR to get a list of all available PR-Agent tools and their descriptions\n\n"
 
             if get_settings().config.publish_output:
                 # publish labels
                 if get_settings().pr_description.publish_labels and self.git_provider.is_supported("get_labels"):
-                    original_labels = self.git_provider.get_pr_labels()
+                    original_labels = self.git_provider.get_pr_labels(update=True)
                     get_logger().debug(f"original labels", artifact=original_labels)
                     user_labels = get_user_labels(original_labels)
-                    get_logger().debug(f"published labels:\n{pr_labels + user_labels}")
-                    self.git_provider.publish_labels(pr_labels + user_labels)
+                    new_labels = pr_labels + user_labels
+                    get_logger().debug(f"published labels", artifact=new_labels)
+                    if sorted(new_labels) != sorted(original_labels):
+                        self.git_provider.publish_labels(new_labels)
+                    else:
+                        get_logger().debug(f"Labels are the same, not updating")
 
                 # publish description
                 if get_settings().pr_description.publish_description_as_comment:
                     full_markdown_description = f"## Title\n\n{pr_title}\n\n___\n{pr_body}"
-                    self.git_provider.publish_comment(full_markdown_description)
+                    if get_settings().pr_description.publish_description_as_comment_persistent:
+                        self.git_provider.publish_persistent_comment(full_markdown_description,
+                                                                     initial_header="## Title",
+                                                                     update_header=True,
+                                                                     name="describe",
+                                                                     final_update_message=False, )
+                    else:
+                        self.git_provider.publish_comment(full_markdown_description)
                 else:
                     self.git_provider.publish_description(pr_title, pr_body)
 
@@ -289,7 +301,7 @@ class PRDescription:
 
         # Remove the 'PR Title' key from the dictionary
         ai_title = self.data.pop('title', self.vars["title"])
-        if get_settings().pr_description.keep_original_user_title:
+        if (not get_settings().pr_description.generate_ai_title):
             # Assign the original PR title to the 'title' variable
             title = self.vars["title"]
         else:
@@ -305,7 +317,11 @@ class PRDescription:
                 value = self.file_label_dict
             else:
                 key_publish = key.rstrip(':').replace("_", " ").capitalize()
-                pr_body += f"## **{key_publish}**\n"
+                if key_publish== "Type":
+                    key_publish = "PR Type"
+                # elif key_publish == "Description":
+                #     key_publish = "PR Description"
+                pr_body += f"### **{key_publish}**\n"
             if 'walkthrough' in key.lower():
                 if self.git_provider.is_supported("gfm_markdown"):
                     pr_body += "<details> <summary>files:</summary>\n\n"
@@ -317,7 +333,7 @@ class PRDescription:
                     pr_body += "</details>\n"
             elif 'pr_files' in key.lower():
                 changes_walkthrough, pr_file_changes = self.process_pr_files_prediction(changes_walkthrough, value)
-                changes_walkthrough = f"## **Changes walkthrough**\n{changes_walkthrough}"
+                changes_walkthrough = f"### **Changes walkthrough** 📝\n{changes_walkthrough}"
             else:
                 # if the value is a list, join its items by comma
                 if isinstance(value, list):

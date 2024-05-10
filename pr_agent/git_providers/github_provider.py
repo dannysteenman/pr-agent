@@ -114,6 +114,11 @@ class GithubProvider(GitProvider):
                 self.git_files = self.pr.get_files()
             return self.git_files
 
+    def get_num_of_files(self):
+        if self.git_files:
+            return self.git_files.totalCount
+        else:
+            return -1
 
     @retry(exceptions=RateLimitExceeded,
            tries=get_settings().github.ratelimit_retries, delay=2, backoff=2, jitter=(1, 3))
@@ -650,9 +655,16 @@ class GithubProvider(GitProvider):
         except Exception as e:
             get_logger().exception(f"Failed to publish labels, error: {e}")
 
-    def get_pr_labels(self):
+    def get_pr_labels(self, update=False):
         try:
-            return [label.name for label in self.pr.labels]
+            if not update:
+                labels =self.pr.labels
+                return [label.name for label in labels]
+            else: # obtain the latest labels. Maybe they changed while the AI was running
+                headers, labels = self.pr._requester.requestJsonAndCheck(
+                    "GET", f"{self.pr.issue_url}/labels")
+                return [label['name'] for label in labels]
+
         except Exception as e:
             get_logger().exception(f"Failed to get labels, error: {e}")
             return []
@@ -733,22 +745,4 @@ class GithubProvider(GitProvider):
             return False
 
     def calc_pr_statistics(self, pull_request_data: dict):
-        try:
-            out = {}
-            from datetime import datetime
-            created_at = pull_request_data['created_at']
-            closed_at = pull_request_data['closed_at']
-            closed_at_datetime = datetime.strptime(closed_at, "%Y-%m-%dT%H:%M:%SZ")
-            created_at_datetime = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ")
-            difference = closed_at_datetime - created_at_datetime
-            out['hours'] = difference.total_seconds() / 3600
-            out['commits'] = pull_request_data['commits']
-            out['comments'] = pull_request_data['comments']
-            out['review_comments'] = pull_request_data['review_comments']
-            out['changed_files'] = pull_request_data['changed_files']
-            out['additions'] = pull_request_data['additions']
-            out['deletions'] = pull_request_data['deletions']
-        except Exception as e:
-            get_logger().exception(f"Failed to calculate PR statistics, error: {e}")
-            return {}
-        return out
+        return {}

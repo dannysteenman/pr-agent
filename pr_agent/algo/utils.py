@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import re
 import textwrap
 from datetime import datetime
@@ -12,7 +13,7 @@ import yaml
 from starlette_context import context
 
 from pr_agent.algo import MAX_TOKENS
-from pr_agent.algo.token_handler import get_token_encoder
+from pr_agent.algo.token_handler import TokenEncoder
 from pr_agent.config_loader import get_settings, global_settings
 from pr_agent.algo.types import FilePatchInfo
 from pr_agent.log import get_logger
@@ -67,10 +68,11 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool = True, increment
         output_data (dict): A dictionary containing data to be converted to markdown format.
     Returns:
         str: The markdown formatted text generated from the input dictionary.
-    """    
+    """
 
     emojis = {
-        "Possible issues": "🔍",
+        "Can be split": "🔀",
+        "Possible issues": "⚡",
         "Score": "🏅",
         "Relevant tests": "🧪",
         "Focused PR": "✨",
@@ -81,9 +83,9 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool = True, increment
     }
     markdown_text = ""
     if not incremental_review:
-        markdown_text += f"## PR Review\n\n"
+        markdown_text += f"## PR Review 🔍\n\n"
     else:
-        markdown_text += f"## Incremental PR Review\n\n"
+        markdown_text += f"## Incremental PR Review 🔍 \n\n"
         markdown_text += f"⏮️ Review for commits since previous PR-Agent review {incremental_review}.\n\n"
     if gfm_supported:
         markdown_text += "<table>\n<tr>\n"
@@ -94,7 +96,8 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool = True, increment
 
     for key, value in output_data['review'].items():
         if value is None or value == '' or value == {} or value == []:
-            continue
+            if key.lower() != 'can_be_split':
+                continue
         key_nice = key.replace('_', ' ').capitalize()
         emoji = emojis.get(key_nice, "")
         if gfm_supported:
@@ -103,6 +106,8 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool = True, increment
             if 'security concerns' in key_nice.lower():
                 value = emphasize_header(value.strip())
                 markdown_text += f"<tr><td> {emoji}&nbsp;<strong>{key_nice}</strong></td><td>\n\n{value}\n\n</td></tr>\n"
+            elif 'can be split' in key_nice.lower():
+                markdown_text += process_can_be_split(emoji, value)
             elif 'possible issues' in key_nice.lower():
                 value = value.strip()
                 issues = value.split('\n- ')
@@ -151,6 +156,38 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool = True, increment
     #print(markdown_text)
 
 
+    return markdown_text
+
+
+def process_can_be_split(emoji, value):
+    # key_nice = "Can this PR be split?"
+    key_nice = "Multiple PR themes"
+    markdown_text = ""
+    if not value or isinstance(value, list) and len(value) == 1:
+        value = "No"
+        markdown_text += f"<tr><td> {emoji}&nbsp;<strong>{key_nice}</strong></td><td>\n\n{value}\n\n</td></tr>\n"
+    else:
+        number_of_splits = len(value)
+        markdown_text += f"<tr><td rowspan={number_of_splits}> {emoji}&nbsp;<strong>{key_nice}</strong></td>\n"
+        for i, split in enumerate(value):
+            title = split.get('title', '')
+            relevant_files = split.get('relevant_files', [])
+            if i == 0:
+                markdown_text += f"<td><details><summary>\nSub-PR theme: <strong>{title}</strong></summary>\n\n"
+                markdown_text += f"<hr>\n"
+                markdown_text += f"Relevant files:\n"
+                markdown_text += f"<ul>\n"
+                for file in relevant_files:
+                    markdown_text += f"<li>{file}</li>\n"
+                markdown_text += f"</ul>\n\n</details></td></tr>\n"
+            else:
+                markdown_text += f"<tr>\n<td><details><summary>\nSub-PR theme: <strong>{title}</strong></summary>\n\n"
+                markdown_text += f"<hr>\n"
+                markdown_text += f"Relevant files:\n"
+                markdown_text += f"<ul>\n"
+                for file in relevant_files:
+                    markdown_text += f"<li>{file}</li>\n"
+                markdown_text += f"</ul>\n\n</details></td></tr>\n"
     return markdown_text
 
 
@@ -530,7 +567,7 @@ def clip_tokens(text: str, max_tokens: int, add_three_dots=True) -> str:
         return text
 
     try:
-        encoder = get_token_encoder()
+        encoder = TokenEncoder.get_token_encoder()
         num_input_tokens = len(encoder.encode(text))
         if num_input_tokens <= max_tokens:
             return text
@@ -539,7 +576,7 @@ def clip_tokens(text: str, max_tokens: int, add_three_dots=True) -> str:
         num_output_chars = int(chars_per_token * max_tokens)
         clipped_text = text[:num_output_chars]
         if add_three_dots:
-            clipped_text += "...(truncated)"
+            clipped_text += "\n...(truncated)"
         return clipped_text
     except Exception as e:
         get_logger().warning(f"Failed to clip tokens: {e}")
@@ -625,3 +662,15 @@ def find_line_number_of_relevant_line_in_file(diff_files: List[FilePatchInfo],
                             absolute_position = start2 + delta - 1
                             break
     return position, absolute_position
+
+def github_action_output(output_data: dict, key_name: str):
+    try:
+        if not get_settings().get('github_action_config.enable_output', False):
+            return
+        
+        key_data = output_data.get(key_name, {})
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+            print(f"{key_name}={json.dumps(key_data, indent=None, ensure_ascii=False)}", file=fh)
+    except Exception as e:
+        get_logger().error(f"Failed to write to GitHub Action output: {e}")
+    return

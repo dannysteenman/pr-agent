@@ -46,6 +46,7 @@ class PRCodeSuggestions:
             num_code_suggestions = get_settings().pr_code_suggestions.num_code_suggestions
 
         self.ai_handler = ai_handler()
+        self.ai_handler.main_pr_language = self.main_language
         self.patches_diff = None
         self.prediction = None
         self.cli_mode = cli_mode
@@ -56,7 +57,7 @@ class PRCodeSuggestions:
             "language": self.main_language,
             "diff": "",  # empty diff for initial calculation
             "num_code_suggestions": num_code_suggestions,
-            "summarize_mode": get_settings().pr_code_suggestions.summarize,
+            "commitable_code_suggestions_mode": get_settings().pr_code_suggestions.commitable_code_suggestions,
             "extra_instructions": get_settings().pr_code_suggestions.extra_instructions,
             "commit_messages_str": self.git_provider.get_commit_messages(),
         }
@@ -75,7 +76,7 @@ class PRCodeSuggestions:
             relevant_configs = {'pr_code_suggestions': dict(get_settings().pr_code_suggestions),
                                 'config': dict(get_settings().config)}
             get_logger().debug("Relevant configs", artifacts=relevant_configs)
-            if get_settings().config.publish_output:
+            if get_settings().config.publish_output and get_settings().config.publish_output_progress:
                 if self.git_provider.is_supported("gfm_markdown"):
                     self.progress_response = self.git_provider.publish_comment(self.progress)
                 else:
@@ -89,7 +90,7 @@ class PRCodeSuggestions:
 
             if (not data) or (not 'code_suggestions' in data) or (not data['code_suggestions']):
                 get_logger().error('No code suggestions found for PR.')
-                pr_body = "## PR Code Suggestions\n\nNo code suggestions found for PR."
+                pr_body = "## PR Code Suggestions ✨\n\nNo code suggestions found for PR."
                 get_logger().debug(f"PR output", artifact=pr_body)
                 if self.progress_response:
                     self.git_provider.edit_comment(self.progress_response, body=pr_body)
@@ -104,7 +105,7 @@ class PRCodeSuggestions:
 
             if get_settings().config.publish_output:
                 self.git_provider.remove_initial_comment()
-                if get_settings().pr_code_suggestions.summarize and self.git_provider.is_supported("gfm_markdown"):
+                if (not get_settings().pr_code_suggestions.commitable_code_suggestions) and self.git_provider.is_supported("gfm_markdown"):
 
                     # generate summarized suggestions
                     pr_body = self.generate_summarized_suggestions(data)
@@ -112,14 +113,25 @@ class PRCodeSuggestions:
 
                     # add usage guide
                     if get_settings().pr_code_suggestions.enable_help_text:
-                        pr_body += "<hr>\n\n<details> <summary><strong>✨ Improve tool usage guide:</strong></summary><hr> \n\n"
+                        pr_body += "<hr>\n\n<details> <summary><strong>💡 Tool usage guide:</strong></summary><hr> \n\n"
                         pr_body += HelpMessage.get_improve_usage_guide()
                         pr_body += "\n</details>\n"
 
-                    if self.progress_response:
-                        self.git_provider.edit_comment(self.progress_response, body=pr_body)
+                    if get_settings().pr_code_suggestions.persistent_comment:
+                        final_update_message = False
+                        self.git_provider.publish_persistent_comment(pr_body,
+                                                                     initial_header="## PR Code Suggestions ✨",
+                                                                     update_header=True,
+                                                                     name="suggestions",
+                                                                     final_update_message=final_update_message, )
+                        if self.progress_response:
+                            self.progress_response.delete()
                     else:
-                        self.git_provider.publish_comment(pr_body)
+
+                        if self.progress_response:
+                            self.git_provider.edit_comment(self.progress_response, body=pr_body)
+                        else:
+                            self.git_provider.publish_comment(pr_body)
 
                 else:
                     self.push_inline_code_suggestions(data)
@@ -184,24 +196,31 @@ class PRCodeSuggestions:
         suggestion_list = []
         one_sentence_summary_list = []
         for i, suggestion in enumerate(data['code_suggestions']):
-            if get_settings().pr_code_suggestions.summarize:
-                if not suggestion or 'one_sentence_summary' not in suggestion or 'label' not in suggestion or 'relevant_file' not in suggestion:
-                    get_logger().debug(f"Skipping suggestion {i + 1}, because it is invalid: {suggestion}")
+            try:
+                if not get_settings().pr_code_suggestions.commitable_code_suggestions:
+                    if not suggestion or 'one_sentence_summary' not in suggestion or 'label' not in suggestion or 'relevant_file' not in suggestion:
+                        get_logger().debug(f"Skipping suggestion {i + 1}, because it is invalid: {suggestion}")
+                        continue
+
+                    if suggestion['one_sentence_summary'] in one_sentence_summary_list:
+                        get_logger().debug(f"Skipping suggestion {i + 1}, because it is a duplicate: {suggestion}")
+                        continue
+
+                if 'const' in suggestion['suggestion_content'] and 'instead' in suggestion['suggestion_content'] and 'let' in suggestion['suggestion_content']:
+                    get_logger().debug(f"Skipping suggestion {i + 1}, because it uses 'const instead let': {suggestion}")
                     continue
 
-                if suggestion['one_sentence_summary'] in one_sentence_summary_list:
-                    get_logger().debug(f"Skipping suggestion {i + 1}, because it is a duplicate: {suggestion}")
-                    continue
-
-            if ('existing_code' in suggestion) and ('improved_code' in suggestion) and (
-                    suggestion['existing_code'] != suggestion['improved_code']):
-                suggestion = self._truncate_if_needed(suggestion)
-                if get_settings().pr_code_suggestions.summarize:
-                    one_sentence_summary_list.append(suggestion['one_sentence_summary'])
-                suggestion_list.append(suggestion)
-            else:
-                get_logger().debug(
-                    f"Skipping suggestion {i + 1}, because existing code is equal to improved code {suggestion['existing_code']}")
+                if ('existing_code' in suggestion) and ('improved_code' in suggestion) and (
+                        suggestion['existing_code'] != suggestion['improved_code']):
+                    suggestion = self._truncate_if_needed(suggestion)
+                    if not get_settings().pr_code_suggestions.commitable_code_suggestions:
+                        one_sentence_summary_list.append(suggestion['one_sentence_summary'])
+                    suggestion_list.append(suggestion)
+                else:
+                    get_logger().debug(
+                        f"Skipping suggestion {i + 1}, because existing code is equal to improved code {suggestion['existing_code']}")
+            except Exception as e:
+                get_logger().error(f"Error processing suggestion {i + 1}: {suggestion}, error: {e}")
         data['code_suggestions'] = suggestion_list
 
         return data
@@ -363,7 +382,7 @@ class PRCodeSuggestions:
 
     def generate_summarized_suggestions(self, data: Dict) -> str:
         try:
-            pr_body = "## PR Code Suggestions\n\n"
+            pr_body = "## PR Code Suggestions ✨\n\n"
 
             if len(data.get('code_suggestions', [])) == 0:
                 pr_body += "No suggestions found to improve this PR."
@@ -375,7 +394,7 @@ class PRCodeSuggestions:
                 for ext in extensions:
                     extension_to_language[ext] = language
 
-            pr_body = "## PR Code Suggestions\n\n"
+            pr_body = "## PR Code Suggestions ✨\n\n"
 
             pr_body += "<table>"
             header = f"Suggestions"
@@ -393,11 +412,7 @@ class PRCodeSuggestions:
 
             for label, suggestions in suggestions_labels.items():
                 num_suggestions=len(suggestions)
-                # pr_body += f"""<tr><td><strong>{label}</strong></td>"""
                 pr_body += f"""<tr><td rowspan={num_suggestions}><strong>{label.capitalize()}</strong></td>\n"""
-                # pr_body += f"""<td>"""
-                # pr_body += f"""<details><summary>{len(suggestions)} suggestions</summary>"""
-                # pr_body += f"""<table>"""
                 for i, suggestion in enumerate(suggestions):
 
                     relevant_file = suggestion['relevant_file'].strip()
@@ -444,11 +459,11 @@ class PRCodeSuggestions:
 {example_code}                   
 """
                     pr_body += f"</details>"
-
                     pr_body += f"</td></tr>"
 
+
                 # pr_body += "</details>"
-                pr_body += """</td></tr>"""
+                # pr_body += """</td></tr>"""
             pr_body += """</tr></tbody></table>"""
             return pr_body
         except Exception as e:

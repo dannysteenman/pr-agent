@@ -26,7 +26,10 @@ class PRUpdateChangelog:
         )
         self.commit_changelog = get_settings().pr_update_changelog.push_changelog_changes
         self._get_changlog_file()  # self.changelog_file_str
+
         self.ai_handler = ai_handler()
+        self.ai_handler.main_pr_language = self.main_language
+
         self.patches_diff = None
         self.prediction = None
         self.cli_mode = cli_mode
@@ -78,7 +81,7 @@ class PRUpdateChangelog:
             if self.commit_changelog:
                 self._push_changelog_update(new_file_content, answer)
             else:
-                self.git_provider.publish_comment(f"**Changelog updates:**\n\n{answer}")
+                self.git_provider.publish_comment(f"**Changelog updates:** 🔄\n\n{answer}")
 
     async def _prepare_prediction(self, model: str):
         self.patches_diff = get_pr_diff(self.git_provider, self.token_handler, model)
@@ -138,7 +141,7 @@ class PRUpdateChangelog:
                 self.git_provider.pr.create_review(commit=last_commit_id, comments=[d])
         except Exception:
             # we can't create a review for some reason, let's just publish a comment
-            self.git_provider.publish_comment(f"**Changelog updates:**\n\n{answer}")
+            self.git_provider.publish_comment(f"**Changelog updates: 🔄**\n\n{answer}")
 
     def _get_default_changelog(self):
         example_changelog = \
