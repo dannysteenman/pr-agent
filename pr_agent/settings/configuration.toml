@@ -1,7 +1,7 @@
 [config]
-model="bedrock/anthropic.claude-v2:1"
-model_turbo="bedrock/anthropic.claude-v2:1"
-fallback_models=["bedrock/anthropic.claude-v2"]
+model="anthropic/claude-3-haiku-20240307"
+model_turbo="anthropic/claude-3-haiku-20240307"
+fallback_models=["anthropic/claude-3-haiku-20240307"]
 git_provider="github"
 publish_output=true
 publish_output_progress=true
