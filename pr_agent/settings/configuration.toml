@@ -1,7 +1,7 @@
 [config]
-model="gpt-4-turbo-2024-04-09"
-model_turbo="gpt-4-turbo-2024-04-09"
-fallback_models=["gpt-4-0125-preview"]
+model="bedrock/anthropic.claude-v2:1"
+model_turbo="bedrock/anthropic.claude-v2:1"
+fallback_models=["bedrock/anthropic.claude-v2"]
 git_provider="github"
 publish_output=true
 publish_output_progress=true
@@ -78,6 +78,7 @@ enable_help_text=false
 
 
 [pr_code_suggestions] # /improve #
+summarize=false
 max_context_tokens=8000
 num_code_suggestions=4
 commitable_code_suggestions = false
