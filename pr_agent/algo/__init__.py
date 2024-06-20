@@ -31,6 +31,7 @@ MAX_TOKENS = {
     'anthropic.claude-instant-v1': 100000,
     'anthropic.claude-v1': 100000,
     'anthropic.claude-v2': 100000,
+    'anthropic/claude-3-haiku-20240307': 100000,
     'anthropic/claude-3-opus-20240229': 100000,
     'bedrock/anthropic.claude-instant-v1': 100000,
     'bedrock/anthropic.claude-v2': 100000,
