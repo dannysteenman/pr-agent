@@ -1,0 +1,19 @@
+name: Sync Fork
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Runs every 6 hours
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Sync Fork
+      uses: tgymnich/fork-sync@v1.8
+      with:
+        owner: Codium-ai  # Owner of the original repo
+        base: main  # The branch in the original repo to sync with
+        head: main  # The branch in your fork to update
+        token: ${{ secrets.PR_AGENT_GITHUB_TOKEN }}
