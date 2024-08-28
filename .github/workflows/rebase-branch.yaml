@@ -23,7 +23,9 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Git Quick Rebase
-        run: git set-upstream && git fetch origin main && git pull && git rebase main
+        run: |
+          git fetch origin main
+          git rebase origin/main
 
       - name: Push changes
         env:
