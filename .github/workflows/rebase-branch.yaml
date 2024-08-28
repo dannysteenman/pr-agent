@@ -16,16 +16,27 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: container
+          fetch-depth: 0
 
       - name: Setup Git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Clean workspace
+        run: |
+          git reset --hard
+          git clean -fdx
+
       - name: Git Quick Rebase
         run: |
           git fetch origin main
           git rebase origin/main
+      - name: Post-Failure Debugging
+        if: failure()
+        run: |
+          git status
+          git diff
 
       - name: Push changes
         env:
