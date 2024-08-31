@@ -1,0 +1,11 @@
+FROM python:3.12.3 AS base
+
+WORKDIR /app
+ADD pyproject.toml .
+ADD requirements.txt .
+RUN pip install . && rm pyproject.toml requirements.txt
+ENV PYTHONPATH=/app
+
+FROM base AS cli
+ADD pr_agent pr_agent
+ENTRYPOINT ["python", "pr_agent/cli.py"]
