@@ -112,3 +112,28 @@ LANGSMITH_API_KEY=<api_key>
 LANGSMITH_PROJECT=<project>
 LANGSMITH_BASE_URL=<url>
 ```
+
+## Ignoring automatic commands in PRs
+
+In some cases, you may want to automatically ignore specific PRs . PR-Agent enables you to ignore PR with a specific title, or from/to specific branches (regex matching).
+
+To ignore PRs with a specific title such as "[Bump]: ...", you can add the following to your `configuration.toml` file:
+
+```
+[config]
+ignore_pr_title = ["\\[Bump\\]"]
+```
+
+Where the `ignore_pr_title` is a list of regex patterns to match the PR title you want to ignore. Default is `ignore_pr_title = ["^\\[Auto\\]", "^Auto"]`.
+
+
+To ignore PRs from specific source or target branches, you can add the following to your `configuration.toml` file:
+
+```
+[config]
+ignore_pr_source_branches = ['develop', 'main', 'master', 'stage']
+ignore_pr_target_branches = ["qa"]
+```
+
+Where the `ignore_pr_source_branches` and `ignore_pr_target_branches` are lists of regex patterns to match the source and target branches you want to ignore.
+They are not mutually exclusive, you can use them together or separately.
