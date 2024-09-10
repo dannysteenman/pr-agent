@@ -1,15 +1,19 @@
+### Overview
+
 [PR-Agent Pro](https://www.codium.ai/pricing/) is a hosted version of PR-Agent, provided by CodiumAI. A complimentary two-week trial is offered, followed by a monthly subscription fee.
 PR-Agent Pro is designed for companies and teams that require additional features and capabilities. It provides the following benefits:
 
 1. **Fully managed** - We take care of everything for you - hosting, models, regular updates, and more. Installation is as simple as signing up and adding the PR-Agent app to your GitHub\GitLab\BitBucket repo.
 
-2. **Improved privacy** - No data will be stored or used to train models. PR-Agent Pro will employ zero data retention, and will use an OpenAI account with zero data retention.
+2. **Improved privacy** - No data will be stored or used to train models. PR-Agent Pro will employ zero data retention, and will use an OpenAI and Claude accounts with zero data retention.
 
 3. **Improved support** - PR-Agent Pro users will receive priority support, and will be able to request new features and capabilities.
 
 4. **Supporting self-hosted git servers** - PR-Agent Pro can be installed on GitHub Enterprise Server, GitLab, and BitBucket. For more information, see the [installation guide](https://pr-agent-docs.codium.ai/installation/pr_agent_pro/).
 
-**Additional features:**
+5. **PR Chat** - PR-Agent Pro allows you to engage in [private chat](https://pr-agent-docs.codium.ai/chrome-extension/features/#pr-chat) about your pull requests on private repositories.
+
+### Additional features
 
 Here are some of the additional features and capabilities that PR-Agent Pro offers:
 
@@ -26,7 +30,7 @@ Here are some of the additional features and capabilities that PR-Agent Pro offe
 | [**SOC2 compliance check**](https://pr-agent-docs.codium.ai/tools/review/#configuration-options)                     | Ensures the PR contains a ticket to a project management system (e.g., Jira, Asana, Trello, etc.)                                                                
 | [**Custom labels**](https://pr-agent-docs.codium.ai/tools/describe/#handle-custom-labels-from-the-repos-labels-page) | Define custom labels for PR-Agent to assign to the PR                                                                                                            |
 
-**Additional tools:**
+### Additional tools
 
 Here are additional tools that are available only for PR-Agent Pro users:
 
@@ -40,3 +44,9 @@ Here are additional tools that are available only for PR-Agent Pro users:
 | [**Similar code search**](https://pr-agent-docs.codium.ai/tools/similar_code/) | Search for similar code in the repository, organization, or entire GitHub |
 
 
+### Supported languages
+
+PR-Agent Pro leverages the world's leading code models - Claude 3.5 Sonnet and GPT-4. 
+As a result, its primary tools such as `describe`, `review`, and `improve`, as well as the PR-chat feature, support virtually all programming languages.
+
+For specialized commands that require static code analysis, PR-Agent Pro offers support for specific languages. For more details about features that require static code analysis, please refer to the [documentation](https://pr-agent-docs.codium.ai/tools/analyze/#overview).
