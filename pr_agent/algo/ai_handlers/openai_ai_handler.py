@@ -4,6 +4,7 @@ import openai
 from openai import APIError, AsyncOpenAI, RateLimitError, Timeout
 from retry import retry
 
+from pr_agent.algo.ai_handlers.base_ai_handler import BaseAiHandler
 from pr_agent.config_loader import get_settings
 from pr_agent.log import get_logger
 
@@ -41,7 +42,6 @@ class OpenAIHandler(BaseAiHandler):
            tries=OPENAI_RETRIES, delay=2, backoff=2, jitter=(1, 3))
     async def chat_completion(self, model: str, system: str, user: str, temperature: float = 0.2):
         try:
-            deployment_id = self.deployment_id
             get_logger().info("System: ", system)
             get_logger().info("User: ", user)
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
