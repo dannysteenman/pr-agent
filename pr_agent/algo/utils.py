@@ -27,6 +27,12 @@ from pr_agent.config_loader import get_settings, global_settings
 from pr_agent.log import get_logger
 
 
+def get_weak_model() -> str:
+    if get_settings().get("config.model_weak"):
+        return get_settings().config.model_weak
+    return get_settings().config.model
+
+
 class Range(BaseModel):
     line_start: int  # should be 0-indexed
     line_end: int
@@ -35,8 +41,7 @@ class Range(BaseModel):
 
 class ModelType(str, Enum):
     REGULAR = "regular"
-    TURBO = "turbo"
-
+    WEAK = "weak"
 
 class PRReviewHeader(str, Enum):
     REGULAR = "## PR Reviewer Guide"
