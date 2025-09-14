@@ -149,6 +149,9 @@ Each compliance is defined in a YAML file as follows:
     - Use clear, actionable language that developers can understand
     - Focus on meaningful compliance requirements, not style preferences
 
+???+ tip "Ready-to-use compliance templates"
+    For production-ready compliance checklist templates organized by programming languages and technology stacks, check out the [PR Compliance Templates repository](https://github.com/qodo-ai/pr-compliance-templates).
+
 ### Local Compliance Checklists
 
 For basic usage, create a `pr_compliance_checklist.yaml` file in your repository's root directory containing the compliance requirements specific to your repository.
