@@ -82,8 +82,7 @@ Then the tool will automatically fetch the suggestions from the PR and display t
 
 ## Next Steps
 
-1. **[Get Started](getting-started.md)**: Try your first PR review
-2. **[Explore Features](features.md)**: Learn about all capabilities
+**[Usage](usage.md)** - Navigate, explore, and implement suggestions
 
 ---
 

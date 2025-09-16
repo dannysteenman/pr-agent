@@ -209,5 +209,3 @@ After implementing the suggestions, you have several options to proceed:
 - **Multi-select strategically** - group related suggestions together
 
 ---
-
-*Ready to explore all features? Check out [Features & Usage](features.md) for comprehensive capabilities.*

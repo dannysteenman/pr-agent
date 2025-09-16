@@ -27,8 +27,7 @@ Work in progress - coming soon!
 ## Quick Start
 
 1. **[Install](installation.md)** Qodo Command
-2. **[Get Started](getting-started.md)** with your first PR review
-3. **[Explore Features](features.md)** for comprehensive capabilities
+2. **[Usage](usage.md)** - Navigate, explore, and implement suggestions
 
 ---
 
