@@ -1,6 +1,6 @@
 # Installation
 
-> Currently for remote suggestions, Qodo Merge has to be installed and active on your Git repository (GitHub / GitLab).
+> For remote suggestions, Qodo Merge needs to be installed and active on your Git repository (GitHub / GitLab), and provide code suggestions in a table format for your Pull Requests (PRs).
 
 ## Install Qodo Command
 
@@ -24,22 +24,6 @@ qodo login
 Once login is completed, you'll receive an API key in the terminal.
 The API key is also saved locally in the .qodo folder in your home directory, and can be reused (e.g., in CI).
 The key is tied to your user account and subject to the same usage limits.
-
-[//]: # (## API Key Management)
-
-[//]: # ()
-[//]: # (There are a few commands that let you maintain the API key:)
-
-[//]: # ()
-[//]: # (```bash)
-
-[//]: # (qodo key list               # List all API keys)
-
-[//]: # (qodo key create <name>      # Create a new API key with the given name)
-
-[//]: # (qodo key revoke <name>      # Revoke an API key by name)
-
-[//]: # (```)
 
 
 ## Using Qodo Merge CLI
@@ -84,6 +68,3 @@ Then the tool will automatically fetch the suggestions from the PR and display t
 
 **[Usage](usage.md)** - Navigate, explore, and implement suggestions
 
----
-
-*The CLI will guide you through any additional setup needed when you first run `qodo merge`.*
