@@ -83,6 +83,12 @@ A list of the models used for generating the baseline suggestions, and example r
       <td style="text-align:center;"><b>41.7</b></td>
     </tr>
     <tr>
+      <td style="text-align:left;">Claude-sonnet-4-5</td>
+      <td style="text-align:left;">2025-09-29</td>
+      <td style="text-align:left;"></td>
+      <td style="text-align:center;"><b>40.7</b></td>
+    </tr>
+    <tr>
       <td style="text-align:left;">Claude-4-sonnet</td>
       <td style="text-align:left;">2025-05-14</td>
       <td style="text-align:left;">4096</td>
@@ -182,6 +188,24 @@ weaknesses:
 - **False positives / speculative fixes:** In several cases it flags non-issues (style, performance, redundant code) or supplies debatable “improvements”, lowering precision and sometimes breaching the “critical bugs only” rule.
 - **Inconsistent error coverage:** For certain domains (build scripts, schema files, test code) it either returns an empty list when real regressions exist or proposes cosmetic edits, indicating gaps in specialised knowledge.
 
+### Claude-sonnet-4-5
+
+Final score: **40.7**
+
+strengths:
+
+- **Concise & well-formatted output:** Most replies strictly follow the schema, stay within the 3-suggestion limit, and include clear, copy-paste-ready patches, making them easy to apply.
+- **Can spot headline bugs:** When a single, obvious regression is present (e.g. duplicated regex block, missing null-check, wrong macro name) the model often detects it and proposes an accurate, minimal fix.
+- **Scope discipline (usually):** It frequently restricts changes to newly-added lines and avoids broad refactors, so many answers comply with the “new code only / critical bugs only” rule.
+- **Reasonable explanations:** The accompanying rationales are typically short but precise, helping reviewers understand why the change is needed.
+
+weaknesses:
+
+- **Low recall of critical issues:** In a large fraction of examples the model misses the primary bug or flags nothing at all while other reviewers find clear problems. Coverage is therefore unreliable.
+- **False or harmful fixes:** A notable number of suggestions mis-diagnose the code, touch unchanged lines, violate task rules, or would break compilation/runtime (wrong paths, bad types, guideline-forbidden advice).
+- **Priority mistakes:** The model often downgrades severe defects to “general” or upgrades cosmetic nits to “critical”, showing weak bug-severity judgment.
+- **Inconsistent quality:** Performance swings widely between excellent and poor; reviewers cannot predict whether a given answer will be thorough, partial, or incorrect.
+
 ### Claude-4 Sonnet (4096 thinking tokens)
 
 Final score: **39.7**
@@ -195,9 +219,9 @@ strengths:
 weaknesses:
 
 - **Low coverage / recall:** Regularly surfaces only one minor issue (or none) while missing other, often more severe, problems caught by peer models.
-- **High “empty-list” rate:** In many diffs the model returns no suggestions even when clear critical bugs exist, offering zero reviewer value.
+- **High "empty-list" rate:** In many diffs the model returns no suggestions even when clear critical bugs exist, offering zero reviewer value.
 - **Occasional incorrect or harmful fixes:** A non-trivial number of suggestions are speculative, contradict code intent, or would break compilation/runtime; sometimes duplicates or contradicts itself.
-- **Inconsistent severity labelling & duplication:** Repeats the same point in multiple slots, marks cosmetic edits as “critical”, or leaves `improved_code` identical to original.
+- **Inconsistent severity labelling & duplication:** Repeats the same point in multiple slots, marks cosmetic edits as "critical", or leaves `improved_code` identical to original.
 
 
 ### Claude-4 Sonnet
