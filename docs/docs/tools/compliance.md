@@ -292,6 +292,27 @@ enable_global_pr_compliance = true
       </tr>
     </table>
 
+???+ example "Section visibility options"
+
+    <table>
+      <tr>
+        <td><b>enable_security_section</b></td>
+        <td>If set to true, the security compliance section will be displayed in the output. When false, the entire security section is hidden. Default is true.</td>
+      </tr>
+      <tr>
+        <td><b>enable_ticket_section</b></td>
+        <td>If set to true, the ticket compliance section will be displayed in the output. When false, the entire ticket section is hidden. Default is true.</td>
+      </tr>
+      <tr>
+        <td><b>enable_codebase_duplication_section</b></td>
+        <td>If set to true, the codebase duplication compliance section will be displayed in the output. When false, the entire codebase duplication section is hidden. Default is true.</td>
+      </tr>
+      <tr>
+        <td><b>enable_custom_compliance_section</b></td>
+        <td>If set to true, the custom compliance section will be displayed in the output. When false, the entire custom section is hidden. Default is true.</td>
+      </tr>
+    </table>
+
 ???+ example "Security compliance options"
 
     <table>
