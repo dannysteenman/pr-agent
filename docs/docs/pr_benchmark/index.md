@@ -83,7 +83,7 @@ A list of the models used for generating the baseline suggestions, and example r
       <td style="text-align:center;"><b>41.7</b></td>
     </tr>
     <tr>
-      <td style="text-align:left;">Claude-sonnet-4-5</td>
+      <td style="text-align:left;">Claude-sonnet-4.5</td>
       <td style="text-align:left;">2025-09-29</td>
       <td style="text-align:left;"></td>
       <td style="text-align:center;"><b>40.7</b></td>
@@ -188,7 +188,7 @@ weaknesses:
 - **False positives / speculative fixes:** In several cases it flags non-issues (style, performance, redundant code) or supplies debatable “improvements”, lowering precision and sometimes breaching the “critical bugs only” rule.
 - **Inconsistent error coverage:** For certain domains (build scripts, schema files, test code) it either returns an empty list when real regressions exist or proposes cosmetic edits, indicating gaps in specialised knowledge.
 
-### Claude-sonnet-4-5
+### Claude-sonnet-4.5
 
 Final score: **40.7**
 
